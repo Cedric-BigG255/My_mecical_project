@@ -57,7 +57,7 @@ const EPrescription: React.FC = () => {
     if (debouncedMedicineSearch) {
       apiClient.get(`/medicines?search=${debouncedMedicineSearch}&limit=10`)
         .then(response => {
-          setMedicines(response.data.data);
+          setMedicines(response.data);
         })
         .catch(error => console.error('Error fetching medicines:', error));
     } else {
