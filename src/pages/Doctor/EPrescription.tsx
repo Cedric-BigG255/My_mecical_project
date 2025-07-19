@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout/Layout';
 import { 
   Search, 
@@ -9,16 +10,17 @@ import {
   User,
   Pill,
   Edit,
+  Loader,
 } from 'lucide-react';
 import { apiClient } from '../../utils/api';
 import { useDebounce } from '../../hooks/useDebounce';
-
 import {
   Patient,
   Medication,
   PrescriptionMedication,
   PrescriptionForm,
 } from '../../types/prescription';
+import { useToast } from '../../components/common/ToastContainer';
 
 const EPrescription: React.FC = () => {
   const [patientSearch, setPatientSearch] = useState('');
@@ -33,7 +35,10 @@ const EPrescription: React.FC = () => {
     advice: '',
     medicines: [],
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const navigate = useNavigate();
+  const { addToast } = useToast();
   const debouncedPatientSearch = useDebounce(patientSearch, 500);
   const debouncedMedicineSearch = useDebounce(medicineSearch, 500);
 
@@ -109,11 +114,20 @@ const EPrescription: React.FC = () => {
   };
 
   const savePrescription = () => {
-    console.log('Saving prescription:', prescriptionForm);
-    // Handle save logic
+    addToast('info', 'Draft saved!');
   };
 
   const sendPrescription = async () => {
+    if (!prescriptionForm.patientId) {
+      addToast('error', 'Please select a patient.');
+      return;
+    }
+    if (prescriptionForm.medicines.length === 0) {
+      addToast('error', 'Please add at least one medication.');
+      return;
+    }
+
+    setIsSubmitting(true);
     const payload = {
       ...prescriptionForm,
       followUpDate: prescriptionForm.followUpDate
@@ -124,101 +138,97 @@ const EPrescription: React.FC = () => {
     try {
       const response = await apiClient.post('/prescriptions', payload);
       if (response.success) {
-        alert('Prescription created successfully!');
-        setSelectedPatient(null);
-        setPrescriptionForm({
-          patientId: '',
-          chiefComplaints: '',
-          findingsOnExam: '',
-          advice: '',
-          medicines: [],
-        });
+        addToast('success', 'Prescription created successfully!');
+        navigate(`/doctor/prescriptions/${response.data.id}`);
       } else {
-        alert(`Error: ${response.message}`);
+        addToast('error', `Error: ${response.message}`);
       }
     } catch (error: any) {
       console.error('Error creating prescription:', error);
-      alert(`Error: ${error.response?.data?.message || 'An unexpected error occurred.'}`);
+      addToast('error', `Error: ${error.response?.data?.message || 'An unexpected error occurred.'}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <Layout title="E-Prescription Tool">
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+      <div className="max-w-7xl mx-auto space-y-8 p-4">
+        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-gray-200">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">E-Prescription Tool</h2>
-            <p className="text-gray-600 mt-1">Create and manage digital prescriptions</p>
+            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">E-Prescription</h1>
+            <p className="text-gray-500 mt-1">Create and manage digital prescriptions with ease.</p>
           </div>
           <div className="mt-4 sm:mt-0 flex space-x-3">
             <button
               onClick={savePrescription}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-medical-500"
             >
               <Save className="w-4 h-4 mr-2" />
               Save Draft
             </button>
             <button
               onClick={sendPrescription}
-              className="inline-flex items-center px-4 py-2 bg-medical-600 text-white rounded-lg hover:bg-medical-700"
+              disabled={isSubmitting}
+              className="inline-flex items-center px-4 py-2 bg-medical-600 text-white rounded-lg text-sm font-medium hover:bg-medical-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-medical-500 disabled:opacity-50"
             >
-              <Send className="w-4 h-4 mr-2" />
-              Send Prescription
+              {isSubmitting ? (
+                <Loader className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4 mr-2" />
+              )}
+              {isSubmitting ? 'Sending...' : 'Send Prescription'}
             </button>
           </div>
-        </div>
+        </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Patient Selection */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Patient</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <aside className="lg:col-span-1 space-y-6">
+            <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <User className="w-5 h-5 mr-3 text-medical-600" />
+                Patient Information
+              </h3>
               
               {selectedPatient ? (
-                <div className="border border-medical-200 rounded-lg p-4 bg-medical-50">
+                <div className="border-2 border-medical-500 rounded-lg p-4 bg-medical-50">
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-medium text-gray-900">{selectedPatient.fullName}</h4>
+                    <h4 className="font-bold text-gray-900 text-lg">{selectedPatient.fullName}</h4>
                     <button
                       onClick={() => {
                         setSelectedPatient(null);
                         setPrescriptionForm(prev => ({ ...prev, patientId: '' }));
                       }}
-                      className="text-gray-400 hover:text-gray-600"
+                      className="text-gray-400 hover:text-red-600 transition-colors"
                     >
-                      <Edit className="w-4 h-4" />
+                      <Edit className="w-5 h-5" />
                     </button>
                   </div>
-                  <p className="text-sm text-gray-600">ID: {selectedPatient.id}</p>
+                  <p className="text-sm text-gray-600">Patient ID: {selectedPatient.id}</p>
                 </div>
               ) : (
                 <div>
-                  <div className="relative mb-4">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <div className="relative">
+                    <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <input
                       type="text"
-                      placeholder="Search patients..."
+                      placeholder="Search patients by name or ID..."
                       value={patientSearch}
                       onChange={(e) => setPatientSearch(e.target.value)}
-                      className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-500 focus:border-transparent outline-none w-full"
+                      className="pl-12 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-500 focus:border-transparent outline-none w-full text-sm"
                     />
                   </div>
                   
                   {patientSearch && (
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                    <div className="mt-4 space-y-2 max-h-60 overflow-y-auto pr-2">
                       {patients.map((patient) => (
                         <div
                           key={patient.id}
                           onClick={() => selectPatient(patient)}
-                          className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                          className="p-3 border border-gray-200 rounded-lg hover:bg-medical-50 hover:border-medical-400 cursor-pointer transition-colors"
                         >
-                          <div className="flex items-center space-x-3">
-                            <User className="w-8 h-8 text-gray-400" />
-                            <div>
-                              <p className="font-medium text-gray-900">{patient.fullName}</p>
-                              <p className="text-sm text-gray-500">ID: {patient.id}</p>
-                            </div>
-                          </div>
+                          <p className="font-semibold text-gray-900">{patient.fullName}</p>
+                          <p className="text-xs text-gray-500">ID: {patient.id}</p>
                         </div>
                       ))}
                     </div>
@@ -226,201 +236,139 @@ const EPrescription: React.FC = () => {
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Prescription Form */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Diagnosis */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Clinical Context</h3>
-              
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Chief Complaints</label>
-                  <textarea
-                    value={prescriptionForm.chiefComplaints}
-                    onChange={(e) => setPrescriptionForm(prev => ({ ...prev, chiefComplaints: e.target.value }))}
-                    placeholder="Patient reports persistent dry cough and fever for 3 days."
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-500 focus:border-transparent outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Findings on Exam</label>
-                  <textarea
-                    value={prescriptionForm.findingsOnExam}
-                    onChange={(e) => setPrescriptionForm(prev => ({ ...prev, findingsOnExam: e.target.value }))}
-                    placeholder="O/E: Temperature 38.5°C. Lungs sound clear. Throat slightly red."
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-500 focus:border-transparent outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Advice</label>
-                  <textarea
-                    value={prescriptionForm.advice}
-                    onChange={(e) => setPrescriptionForm(prev => ({ ...prev, advice: e.target.value }))}
-                    placeholder="Get plenty of rest and stay hydrated. Monitor temperature."
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-500 focus:border-transparent outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Follow-up Date (Optional)</label>
-                  <input
-                    type="date"
-                    value={prescriptionForm.followUpDate}
-                    onChange={(e) => setPrescriptionForm(prev => ({ ...prev, followUpDate: e.target.value }))}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-500 focus:border-transparent outline-none"
-                  />
-                </div>
+                <textarea
+                  value={prescriptionForm.chiefComplaints}
+                  onChange={(e) => setPrescriptionForm(prev => ({ ...prev, chiefComplaints: e.target.value }))}
+                  placeholder="Chief Complaints"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-500 focus:border-transparent outline-none text-sm"
+                />
+                <textarea
+                  value={prescriptionForm.findingsOnExam}
+                  onChange={(e) => setPrescriptionForm(prev => ({ ...prev, findingsOnExam: e.target.value }))}
+                  placeholder="Findings on Exam"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-500 focus:border-transparent outline-none text-sm"
+                />
+                <textarea
+                  value={prescriptionForm.advice}
+                  onChange={(e) => setPrescriptionForm(prev => ({ ...prev, advice: e.target.value }))}
+                  placeholder="Advice"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-500 focus:border-transparent outline-none text-sm"
+                />
+                <input
+                  type="date"
+                  value={prescriptionForm.followUpDate}
+                  onChange={(e) => setPrescriptionForm(prev => ({ ...prev, followUpDate: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-500 focus:border-transparent outline-none text-sm"
+                />
               </div>
             </div>
+          </aside>
 
-            {/* Medications */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <main className="lg:col-span-2">
+            <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Medications</h3>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <Pill className="w-5 h-5 mr-3 text-medical-600" />
+                  Medications
+                </h3>
+                <div className="relative w-full max-w-sm">
+                  <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
                     type="text"
-                    placeholder="Search medications..."
+                    placeholder="Search & add medications..."
                     value={medicineSearch}
                     onChange={(e) => setMedicineSearch(e.target.value)}
-                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-500 focus:border-transparent outline-none w-64"
+                    className="pl-12 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-500 focus:border-transparent outline-none w-full text-sm"
                   />
                 </div>
               </div>
 
-              {/* Medication Search Results */}
               {medicineSearch && (
-                <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Search Results:</p>
-                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
                     {medicines.map((medication) => (
                       <div
                         key={medication.id}
                         onClick={() => addMedication(medication)}
-                        className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded cursor-pointer hover:bg-gray-50"
+                        className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-md cursor-pointer hover:bg-medical-50 transition-colors"
                       >
                         <div>
-                          <p className="font-medium text-gray-900">{medication.brandName}</p>
-                          <p className="text-sm text-gray-500">{medication.genericName}</p>
+                          <p className="font-semibold text-gray-900">{medication.brandName}</p>
+                          <p className="text-xs text-gray-500">{medication.genericName}</p>
                         </div>
-                        <Plus className="w-4 h-4 text-medical-600" />
+                        <Plus className="w-5 h-5 text-medical-600" />
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Added Medications */}
               <div className="space-y-4">
                 {prescriptionForm.medicines.map((medication, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-4">
+                  <div key={index} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
                     <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center space-x-3">
-                        <Pill className="w-5 h-5 text-medical-600" />
-                        <div>
-                          <h4 className="font-medium text-gray-900">{medication.name}</h4>
-                          <p className="text-sm text-gray-500">{medication.genericName}</p>
-                        </div>
+                      <div>
+                        <h4 className="font-bold text-gray-800">{medication.name}</h4>
+                        <p className="text-sm text-gray-500">{medication.genericName}</p>
                       </div>
                       <button
                         onClick={() => removeMedication(index)}
-                        className="text-red-400 hover:text-red-600"
+                        className="text-red-500 hover:text-red-700 transition-colors"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-5 h-5" />
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Route</label>
-                        <input
-                          type="text"
-                          value={medication.route}
-                          onChange={(e) => updateMedication(index, 'route', e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-medical-500 focus:border-transparent outline-none"
-                        />
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Route</label>
+                        <input type="text" value={medication.route} onChange={(e) => updateMedication(index, 'route', e.target.value)} className="w-full p-2 border rounded-md" />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Form</label>
-                        <input
-                          type="text"
-                          value={medication.form}
-                          onChange={(e) => updateMedication(index, 'form', e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-medical-500 focus:border-transparent outline-none"
-                        />
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Form</label>
+                        <input type="text" value={medication.form} onChange={(e) => updateMedication(index, 'form', e.target.value)} className="w-full p-2 border rounded-md" />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Quantity per Dose</label>
-                        <input
-                          type="number"
-                          value={medication.quantityPerDose}
-                          onChange={(e) => updateMedication(index, 'quantityPerDose', parseInt(e.target.value))}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-medical-500 focus:border-transparent outline-none"
-                        />
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Dose</label>
+                        <input type="number" value={medication.quantityPerDose} onChange={(e) => updateMedication(index, 'quantityPerDose', parseInt(e.target.value))} className="w-full p-2 border rounded-md" />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Frequency</label>
-                        <input
-                          type="text"
-                          value={medication.frequency}
-                          onChange={(e) => updateMedication(index, 'frequency', e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-medical-500 focus:border-transparent outline-none"
-                        />
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Frequency</label>
+                        <input type="text" value={medication.frequency} onChange={(e) => updateMedication(index, 'frequency', e.target.value)} className="w-full p-2 border rounded-md" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Duration</label>
+                        <input type="number" value={medication.durationInDays} onChange={(e) => updateMedication(index, 'durationInDays', parseInt(e.target.value))} className="w-full p-2 border rounded-md" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Total Qty</label>
+                        <input type="text" value={medication.totalQuantity} onChange={(e) => updateMedication(index, 'totalQuantity', e.target.value)} className="w-full p-2 border rounded-md" />
                       </div>
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Duration (Days)</label>
-                        <input
-                          type="number"
-                          value={medication.durationInDays}
-                          onChange={(e) => updateMedication(index, 'durationInDays', parseInt(e.target.value))}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-medical-500 focus:border-transparent outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Total Quantity</label>
-                        <input
-                          type="text"
-                          value={medication.totalQuantity}
-                          onChange={(e) => updateMedication(index, 'totalQuantity', e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-medical-500 focus:border-transparent outline-none"
-                        />
-                      </div>
-                    </div>
-
                     <div className="mt-3">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Full Instruction</label>
-                      <input
-                        type="text"
-                        value={medication.fullInstruction}
-                        onChange={(e) => updateMedication(index, 'fullInstruction', e.target.value)}
-                        placeholder="e.g. 1 tab tid for 5 days"
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-medical-500 focus:border-transparent outline-none"
-                      />
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Instruction</label>
+                      <input type="text" value={medication.fullInstruction} onChange={(e) => updateMedication(index, 'fullInstruction', e.target.value)} className="w-full p-2 border rounded-md" />
                     </div>
                   </div>
                 ))}
 
                 {prescriptionForm.medicines.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    <Pill className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                    <p>No medications added yet</p>
-                    <p className="text-sm">Search and add medications above</p>
+                  <div className="text-center py-12 text-gray-500 border-2 border-dashed rounded-lg">
+                    <Pill className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                    <h3 className="text-lg font-medium">No medications added</h3>
+                    <p className="text-sm">Search for medications to add them to the prescription.</p>
                   </div>
                 )}
               </div>
             </div>
-          </div>
+          </main>
         </div>
       </div>
     </Layout>
