@@ -114,8 +114,15 @@ const EPrescription: React.FC = () => {
   };
 
   const sendPrescription = async () => {
+    const payload = {
+      ...prescriptionForm,
+      followUpDate: prescriptionForm.followUpDate
+        ? new Date(prescriptionForm.followUpDate).toISOString()
+        : undefined,
+    };
+
     try {
-      const response = await apiClient.post('/prescriptions', prescriptionForm);
+      const response = await apiClient.post('/prescriptions', payload);
       if (response.success) {
         alert('Prescription created successfully!');
         setSelectedPatient(null);
