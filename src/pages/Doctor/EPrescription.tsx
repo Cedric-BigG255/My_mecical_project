@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../../components/Layout/Layout';
 import { 
-  FileText, 
   Search, 
   Plus,
   Trash2,
@@ -9,152 +8,104 @@ import {
   Send,
   User,
   Pill,
-  Calendar,
-  Clock,
-  AlertCircle,
-  CheckCircle,
   Edit,
-  Copy
 } from 'lucide-react';
+import { apiClient } from '../../utils/api';
+import { useDebounce } from '../../hooks/useDebounce';
 
-interface Medication {
-  id: string;
-  name: string;
-  genericName: string;
-  dosage: string;
-  frequency: string;
-  duration: string;
-  instructions: string;
-  quantity: number;
-  refills: number;
-}
-
-interface PrescriptionForm {
-  patientId: string;
-  patientName: string;
-  diagnosis: string;
-  medications: Medication[];
-  notes: string;
-  followUpDate?: string;
-}
+import {
+  Patient,
+  Medication,
+  PrescriptionMedication,
+  PrescriptionForm,
+} from '../../types/prescription';
 
 const EPrescription: React.FC = () => {
-  const [searchPatient, setSearchPatient] = useState('');
-  const [selectedPatient, setSelectedPatient] = useState<any>(null);
-  const [searchMedication, setSearchMedication] = useState('');
+  const [patientSearch, setPatientSearch] = useState('');
+  const [medicineSearch, setMedicineSearch] = useState('');
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [medicines, setMedicines] = useState<Medication[]>([]);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [prescriptionForm, setPrescriptionForm] = useState<PrescriptionForm>({
     patientId: '',
-    patientName: '',
-    diagnosis: '',
-    medications: [],
-    notes: '',
-    followUpDate: ''
+    chiefComplaints: '',
+    findingsOnExam: '',
+    advice: '',
+    medicines: [],
   });
 
-  // Mock data
-  const patients = [
-    { id: 'P001', name: 'John Smith', age: 39, bloodType: 'A+' },
-    { id: 'P002', name: 'Sarah Johnson', age: 32, bloodType: 'O-' },
-    { id: 'P003', name: 'Michael Brown', age: 46, bloodType: 'B+' },
-    { id: 'P004', name: 'Emily Davis', age: 29, bloodType: 'AB+' }
-  ];
+  const debouncedPatientSearch = useDebounce(patientSearch, 500);
+  const debouncedMedicineSearch = useDebounce(medicineSearch, 500);
 
-  const medications = [
-    {
-      id: 'M001',
-      name: 'Lisinopril',
-      genericName: 'Lisinopril',
-      commonDosages: ['5mg', '10mg', '20mg'],
-      category: 'ACE Inhibitor'
-    },
-    {
-      id: 'M002',
-      name: 'Metformin',
-      genericName: 'Metformin HCl',
-      commonDosages: ['500mg', '850mg', '1000mg'],
-      category: 'Antidiabetic'
-    },
-    {
-      id: 'M003',
-      name: 'Amoxicillin',
-      genericName: 'Amoxicillin',
-      commonDosages: ['250mg', '500mg', '875mg'],
-      category: 'Antibiotic'
-    },
-    {
-      id: 'M004',
-      name: 'Atorvastatin',
-      genericName: 'Atorvastatin Calcium',
-      commonDosages: ['10mg', '20mg', '40mg', '80mg'],
-      category: 'Statin'
+  useEffect(() => {
+    if (debouncedPatientSearch) {
+      apiClient.get(`/users/patients?search=${debouncedPatientSearch}&limit=10`)
+        .then(response => {
+          setPatients(response.data.data.map((p: any) => ({
+            id: p.patientProfile.id,
+            fullName: p.patientProfile.fullName,
+            dateOfBirth: p.patientProfile.dateOfBirth,
+          })));
+        })
+        .catch(error => console.error('Error fetching patients:', error));
+    } else {
+      setPatients([]);
     }
-  ];
+  }, [debouncedPatientSearch]);
 
-  const commonDiagnoses = [
-    'Hypertension',
-    'Type 2 Diabetes',
-    'Upper Respiratory Infection',
-    'Acute Bronchitis',
-    'Hyperlipidemia',
-    'Gastroesophageal Reflux Disease',
-    'Urinary Tract Infection',
-    'Allergic Rhinitis'
-  ];
+  useEffect(() => {
+    if (debouncedMedicineSearch) {
+      apiClient.get(`/medicines?search=${debouncedMedicineSearch}&limit=10`)
+        .then(response => {
+          setMedicines(response.data);
+        })
+        .catch(error => console.error('Error fetching medicines:', error));
+    } else {
+      setMedicines([]);
+    }
+  }, [debouncedMedicineSearch]);
 
-  const filteredPatients = patients.filter(patient =>
-    patient.name.toLowerCase().includes(searchPatient.toLowerCase()) ||
-    patient.id.toLowerCase().includes(searchPatient.toLowerCase())
-  );
-
-  const filteredMedications = medications.filter(med =>
-    med.name.toLowerCase().includes(searchMedication.toLowerCase()) ||
-    med.genericName.toLowerCase().includes(searchMedication.toLowerCase())
-  );
-
-  const addMedication = (medication: any) => {
-    const newMedication: Medication = {
-      id: Date.now().toString(),
-      name: medication.name,
+  const addMedication = (medication: Medication) => {
+    const newMedication: PrescriptionMedication = {
+      medicineId: medication.id,
+      name: medication.brandName,
       genericName: medication.genericName,
-      dosage: medication.commonDosages[0],
-      frequency: 'Once daily',
-      duration: '30 days',
-      instructions: 'Take with food',
-      quantity: 30,
-      refills: 0
+      route: 'PO',
+      form: 'Tablet',
+      quantityPerDose: 1,
+      frequency: 'tid',
+      durationInDays: 5,
+      fullInstruction: '1 tab tid for 5 days',
+      totalQuantity: '15 tabs',
     };
 
     setPrescriptionForm(prev => ({
       ...prev,
-      medications: [...prev.medications, newMedication]
+      medicines: [...prev.medicines, newMedication],
     }));
-    setSearchMedication('');
+    setMedicineSearch('');
   };
 
-  const updateMedication = (id: string, field: keyof Medication, value: any) => {
+  const updateMedication = (index: number, field: keyof PrescriptionMedication, value: any) => {
     setPrescriptionForm(prev => ({
       ...prev,
-      medications: prev.medications.map(med =>
-        med.id === id ? { ...med, [field]: value } : med
-      )
+      medicines: prev.medicines.map((med, i) =>
+        i === index ? { ...med, [field]: value } : med
+      ),
     }));
   };
 
-  const removeMedication = (id: string) => {
+  const removeMedication = (index: number) => {
     setPrescriptionForm(prev => ({
       ...prev,
-      medications: prev.medications.filter(med => med.id !== id)
+      medicines: prev.medicines.filter((_, i) => i !== index),
     }));
   };
 
-  const selectPatient = (patient: any) => {
+  const selectPatient = (patient: Patient) => {
     setSelectedPatient(patient);
-    setPrescriptionForm(prev => ({
-      ...prev,
-      patientId: patient.id,
-      patientName: patient.name
-    }));
-    setSearchPatient('');
+    setPrescriptionForm(prev => ({ ...prev, patientId: patient.id }));
+    setPatientSearch('');
   };
 
   const savePrescription = () => {
@@ -162,9 +113,33 @@ const EPrescription: React.FC = () => {
     // Handle save logic
   };
 
-  const sendPrescription = () => {
-    console.log('Sending prescription:', prescriptionForm);
-    // Handle send logic
+  const sendPrescription = async () => {
+    const payload = {
+      ...prescriptionForm,
+      followUpDate: prescriptionForm.followUpDate
+        ? new Date(prescriptionForm.followUpDate).toISOString()
+        : undefined,
+    };
+
+    try {
+      const response = await apiClient.post('/prescriptions', payload);
+      if (response.success) {
+        alert('Prescription created successfully!');
+        setSelectedPatient(null);
+        setPrescriptionForm({
+          patientId: '',
+          chiefComplaints: '',
+          findingsOnExam: '',
+          advice: '',
+          medicines: [],
+        });
+      } else {
+        alert(`Error: ${response.message}`);
+      }
+    } catch (error: any) {
+      console.error('Error creating prescription:', error);
+      alert(`Error: ${error.response?.data?.message || 'An unexpected error occurred.'}`);
+    }
   };
 
   return (
@@ -203,11 +178,11 @@ const EPrescription: React.FC = () => {
               {selectedPatient ? (
                 <div className="border border-medical-200 rounded-lg p-4 bg-medical-50">
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-medium text-gray-900">{selectedPatient.name}</h4>
+                    <h4 className="font-medium text-gray-900">{selectedPatient.fullName}</h4>
                     <button
                       onClick={() => {
                         setSelectedPatient(null);
-                        setPrescriptionForm(prev => ({ ...prev, patientId: '', patientName: '' }));
+                        setPrescriptionForm(prev => ({ ...prev, patientId: '' }));
                       }}
                       className="text-gray-400 hover:text-gray-600"
                     >
@@ -215,8 +190,6 @@ const EPrescription: React.FC = () => {
                     </button>
                   </div>
                   <p className="text-sm text-gray-600">ID: {selectedPatient.id}</p>
-                  <p className="text-sm text-gray-600">Age: {selectedPatient.age} years</p>
-                  <p className="text-sm text-gray-600">Blood Type: {selectedPatient.bloodType}</p>
                 </div>
               ) : (
                 <div>
@@ -225,15 +198,15 @@ const EPrescription: React.FC = () => {
                     <input
                       type="text"
                       placeholder="Search patients..."
-                      value={searchPatient}
-                      onChange={(e) => setSearchPatient(e.target.value)}
+                      value={patientSearch}
+                      onChange={(e) => setPatientSearch(e.target.value)}
                       className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-500 focus:border-transparent outline-none w-full"
                     />
                   </div>
                   
-                  {searchPatient && (
+                  {patientSearch && (
                     <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {filteredPatients.map((patient) => (
+                      {patients.map((patient) => (
                         <div
                           key={patient.id}
                           onClick={() => selectPatient(patient)}
@@ -242,7 +215,7 @@ const EPrescription: React.FC = () => {
                           <div className="flex items-center space-x-3">
                             <User className="w-8 h-8 text-gray-400" />
                             <div>
-                              <p className="font-medium text-gray-900">{patient.name}</p>
+                              <p className="font-medium text-gray-900">{patient.fullName}</p>
                               <p className="text-sm text-gray-500">ID: {patient.id}</p>
                             </div>
                           </div>
@@ -253,57 +226,43 @@ const EPrescription: React.FC = () => {
                 </div>
               )}
             </div>
-
-            {/* Quick Templates */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mt-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Templates</h3>
-              <div className="space-y-2">
-                <button className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                  <p className="font-medium text-gray-900">Hypertension Treatment</p>
-                  <p className="text-sm text-gray-500">Lisinopril + Hydrochlorothiazide</p>
-                </button>
-                <button className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                  <p className="font-medium text-gray-900">Diabetes Management</p>
-                  <p className="text-sm text-gray-500">Metformin + Insulin</p>
-                </button>
-                <button className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                  <p className="font-medium text-gray-900">Respiratory Infection</p>
-                  <p className="text-sm text-gray-500">Amoxicillin + Cough suppressant</p>
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* Prescription Form */}
           <div className="lg:col-span-2 space-y-6">
             {/* Diagnosis */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Diagnosis & Notes</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Clinical Context</h3>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Primary Diagnosis</label>
-                  <input
-                    type="text"
-                    value={prescriptionForm.diagnosis}
-                    onChange={(e) => setPrescriptionForm(prev => ({ ...prev, diagnosis: e.target.value }))}
-                    placeholder="Enter diagnosis..."
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Chief Complaints</label>
+                  <textarea
+                    value={prescriptionForm.chiefComplaints}
+                    onChange={(e) => setPrescriptionForm(prev => ({ ...prev, chiefComplaints: e.target.value }))}
+                    placeholder="Patient reports persistent dry cough and fever for 3 days."
+                    rows={3}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-500 focus:border-transparent outline-none"
-                    list="diagnoses"
                   />
-                  <datalist id="diagnoses">
-                    {commonDiagnoses.map((diagnosis, index) => (
-                      <option key={index} value={diagnosis} />
-                    ))}
-                  </datalist>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Clinical Notes</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Findings on Exam</label>
                   <textarea
-                    value={prescriptionForm.notes}
-                    onChange={(e) => setPrescriptionForm(prev => ({ ...prev, notes: e.target.value }))}
-                    placeholder="Additional notes, instructions, or observations..."
+                    value={prescriptionForm.findingsOnExam}
+                    onChange={(e) => setPrescriptionForm(prev => ({ ...prev, findingsOnExam: e.target.value }))}
+                    placeholder="O/E: Temperature 38.5°C. Lungs sound clear. Throat slightly red."
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-500 focus:border-transparent outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Advice</label>
+                  <textarea
+                    value={prescriptionForm.advice}
+                    onChange={(e) => setPrescriptionForm(prev => ({ ...prev, advice: e.target.value }))}
+                    placeholder="Get plenty of rest and stay hydrated. Monitor temperature."
                     rows={3}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-500 focus:border-transparent outline-none"
                   />
@@ -330,27 +289,27 @@ const EPrescription: React.FC = () => {
                   <input
                     type="text"
                     placeholder="Search medications..."
-                    value={searchMedication}
-                    onChange={(e) => setSearchMedication(e.target.value)}
+                    value={medicineSearch}
+                    onChange={(e) => setMedicineSearch(e.target.value)}
                     className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-500 focus:border-transparent outline-none w-64"
                   />
                 </div>
               </div>
 
               {/* Medication Search Results */}
-              {searchMedication && (
+              {medicineSearch && (
                 <div className="mb-4 p-4 bg-gray-50 rounded-lg">
                   <p className="text-sm font-medium text-gray-700 mb-2">Search Results:</p>
                   <div className="space-y-2 max-h-32 overflow-y-auto">
-                    {filteredMedications.map((medication) => (
+                    {medicines.map((medication) => (
                       <div
                         key={medication.id}
                         onClick={() => addMedication(medication)}
                         className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded cursor-pointer hover:bg-gray-50"
                       >
                         <div>
-                          <p className="font-medium text-gray-900">{medication.name}</p>
-                          <p className="text-sm text-gray-500">{medication.genericName} • {medication.category}</p>
+                          <p className="font-medium text-gray-900">{medication.brandName}</p>
+                          <p className="text-sm text-gray-500">{medication.genericName}</p>
                         </div>
                         <Plus className="w-4 h-4 text-medical-600" />
                       </div>
@@ -361,8 +320,8 @@ const EPrescription: React.FC = () => {
 
               {/* Added Medications */}
               <div className="space-y-4">
-                {prescriptionForm.medications.map((medication, index) => (
-                  <div key={medication.id} className="border border-gray-200 rounded-lg p-4">
+                {prescriptionForm.medicines.map((medication, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center space-x-3">
                         <Pill className="w-5 h-5 text-medical-600" />
@@ -372,7 +331,7 @@ const EPrescription: React.FC = () => {
                         </div>
                       </div>
                       <button
-                        onClick={() => removeMedication(medication.id)}
+                        onClick={() => removeMedication(index)}
                         className="text-red-400 hover:text-red-600"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -381,76 +340,78 @@ const EPrescription: React.FC = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Dosage</label>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Route</label>
                         <input
                           type="text"
-                          value={medication.dosage}
-                          onChange={(e) => updateMedication(medication.id, 'dosage', e.target.value)}
+                          value={medication.route}
+                          onChange={(e) => updateMedication(index, 'route', e.target.value)}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-medical-500 focus:border-transparent outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Form</label>
+                        <input
+                          type="text"
+                          value={medication.form}
+                          onChange={(e) => updateMedication(index, 'form', e.target.value)}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-medical-500 focus:border-transparent outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Quantity per Dose</label>
+                        <input
+                          type="number"
+                          value={medication.quantityPerDose}
+                          onChange={(e) => updateMedication(index, 'quantityPerDose', parseInt(e.target.value))}
                           className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-medical-500 focus:border-transparent outline-none"
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">Frequency</label>
-                        <select
-                          value={medication.frequency}
-                          onChange={(e) => updateMedication(medication.id, 'frequency', e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-medical-500 focus:border-transparent outline-none"
-                        >
-                          <option>Once daily</option>
-                          <option>Twice daily</option>
-                          <option>Three times daily</option>
-                          <option>Four times daily</option>
-                          <option>As needed</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Duration</label>
                         <input
                           type="text"
-                          value={medication.duration}
-                          onChange={(e) => updateMedication(medication.id, 'duration', e.target.value)}
+                          value={medication.frequency}
+                          onChange={(e) => updateMedication(index, 'frequency', e.target.value)}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-medical-500 focus:border-transparent outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Duration (Days)</label>
+                        <input
+                          type="number"
+                          value={medication.durationInDays}
+                          onChange={(e) => updateMedication(index, 'durationInDays', parseInt(e.target.value))}
                           className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-medical-500 focus:border-transparent outline-none"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Quantity</label>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Total Quantity</label>
                         <input
-                          type="number"
-                          value={medication.quantity}
-                          onChange={(e) => updateMedication(medication.id, 'quantity', parseInt(e.target.value))}
+                          type="text"
+                          value={medication.totalQuantity}
+                          onChange={(e) => updateMedication(index, 'totalQuantity', e.target.value)}
                           className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-medical-500 focus:border-transparent outline-none"
                         />
                       </div>
                     </div>
 
                     <div className="mt-3">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Instructions</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Full Instruction</label>
                       <input
                         type="text"
-                        value={medication.instructions}
-                        onChange={(e) => updateMedication(medication.id, 'instructions', e.target.value)}
-                        placeholder="Special instructions for patient..."
+                        value={medication.fullInstruction}
+                        onChange={(e) => updateMedication(index, 'fullInstruction', e.target.value)}
+                        placeholder="e.g. 1 tab tid for 5 days"
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-medical-500 focus:border-transparent outline-none"
                       />
-                    </div>
-
-                    <div className="mt-3 flex items-center space-x-4">
-                      <div className="flex items-center space-x-2">
-                        <label className="text-xs font-medium text-gray-700">Refills:</label>
-                        <input
-                          type="number"
-                          value={medication.refills}
-                          onChange={(e) => updateMedication(medication.id, 'refills', parseInt(e.target.value))}
-                          min="0"
-                          max="5"
-                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-medical-500 focus:border-transparent outline-none"
-                        />
-                      </div>
                     </div>
                   </div>
                 ))}
 
-                {prescriptionForm.medications.length === 0 && (
+                {prescriptionForm.medicines.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
                     <Pill className="w-12 h-12 text-gray-400 mx-auto mb-2" />
                     <p>No medications added yet</p>
@@ -459,50 +420,6 @@ const EPrescription: React.FC = () => {
                 )}
               </div>
             </div>
-
-            {/* Prescription Preview */}
-            {(selectedPatient && prescriptionForm.medications.length > 0) && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Prescription Preview</h3>
-                
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="border-b border-gray-200 pb-4 mb-4">
-                    <h4 className="font-semibold text-gray-900">Dr. John Smith, MD</h4>
-                    <p className="text-sm text-gray-600">Internal Medicine</p>
-                    <p className="text-sm text-gray-600">License: MD123456</p>
-                  </div>
-
-                  <div className="mb-4">
-                    <p className="font-medium text-gray-900">Patient: {selectedPatient.name}</p>
-                    <p className="text-sm text-gray-600">ID: {selectedPatient.id}</p>
-                    <p className="text-sm text-gray-600">Date: {new Date().toLocaleDateString()}</p>
-                  </div>
-
-                  <div className="mb-4">
-                    <p className="font-medium text-gray-900">Diagnosis: {prescriptionForm.diagnosis}</p>
-                  </div>
-
-                  <div className="space-y-3">
-                    {prescriptionForm.medications.map((med, index) => (
-                      <div key={med.id} className="bg-white p-3 rounded border">
-                        <p className="font-medium">{index + 1}. {med.name} {med.dosage}</p>
-                        <p className="text-sm text-gray-600">
-                          {med.frequency} for {med.duration} • Qty: {med.quantity} • Refills: {med.refills}
-                        </p>
-                        <p className="text-sm text-gray-600">Instructions: {med.instructions}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {prescriptionForm.notes && (
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      <p className="font-medium text-gray-900">Notes:</p>
-                      <p className="text-sm text-gray-600">{prescriptionForm.notes}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
