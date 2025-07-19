@@ -31,3 +31,10 @@ export interface PrescriptionForm {
   followUpDate?: string;
   medicines: PrescriptionMedication[];
 }
+
+export interface Prescription extends PrescriptionForm {
+  id: string;
+  createdAt: string;
+  patient: Patient;
+  status: string;
+}
