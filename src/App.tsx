@@ -24,6 +24,7 @@ import MyPatients from './pages/Doctor/MyPatients';
 import EPrescription from './pages/Doctor/EPrescription';
 import RegisterPatient from './pages/Doctor/RegisterPatient';
 import MyPrescriptionsDoctor from './pages/Doctor/MyPrescriptions';
+import PrescriptionDetails from './pages/Doctor/PrescriptionDetails';
 
 // Pharmacist Pages
 import PrescriptionManagement from './pages/Pharmacist/PrescriptionManagement';
@@ -139,6 +140,11 @@ const AppContent: React.FC = () => {
       <Route path="/doctor/my-prescriptions" element={
         <ProtectedRoute allowedRoles={['doctor']}>
           <MyPrescriptionsDoctor />
+        </ProtectedRoute>
+      } />
+      <Route path="/doctor/prescriptions/:id" element={
+        <ProtectedRoute allowedRoles={['doctor']}>
+          <PrescriptionDetails />
         </ProtectedRoute>
       } />
       
