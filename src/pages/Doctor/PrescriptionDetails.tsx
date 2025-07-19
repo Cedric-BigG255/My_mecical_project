@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import Layout from '../../components/Layout/Layout';
 import { apiClient } from '../../utils/api';
-import { Prescription } from '../../types/prescription';
-import { Loader, AlertTriangle, User, Calendar, Stethoscope, Pill, Printer } from 'lucide-react';
+import { Prescription } from '../../types/prescription'; // This will need to be updated
 
 const PrescriptionDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -22,7 +21,7 @@ const PrescriptionDetails: React.FC = () => {
           setError(response.message || 'Failed to fetch prescription details.');
         }
       } catch (err: any) {
-        setError(err.response?.data?.message || 'An error occurred while fetching details.');
+        setError(err.response?.data?.message || 'An error occurred.');
       } finally {
         setLoading(false);
       }
@@ -33,111 +32,76 @@ const PrescriptionDetails: React.FC = () => {
     }
   }, [id]);
 
-  const InfoCard: React.FC<{ title: string; children: React.ReactNode; icon: React.ElementType }> = ({ title, children, icon: Icon }) => (
-    <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-        <Icon className="w-5 h-5 mr-3 text-medical-600" />
-        {title}
-      </h3>
-      <div className="space-y-3 text-sm">{children}</div>
-    </div>
-  );
-
-  const DetailItem: React.FC<{ label: string; value?: string | null }> = ({ label, value }) => (
-    value ? <div>
-      <p className="font-medium text-gray-500">{label}</p>
-      <p className="text-gray-800">{value}</p>
-    </div> : null
-  );
-
   if (loading) {
-    return (
-      <Layout title="Prescription Details">
-        <div className="flex justify-center items-center h-64">
-          <Loader className="w-8 h-8 animate-spin text-medical-600" />
-        </div>
-      </Layout>
-    );
+    return <Layout title="Prescription Details"><div className="text-center py-8"><p>Loading...</p></div></Layout>;
   }
 
   if (error) {
-    return (
-      <Layout title="Error">
-        <div className="max-w-2xl mx-auto mt-10 bg-red-50 border-l-4 border-red-400 p-4 rounded-md">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <AlertTriangle className="h-5 w-5 text-red-400" aria-hidden="true" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          </div>
-        </div>
-      </Layout>
-    );
+    return <Layout title="Prescription Details"><div className="text-center py-8 text-red-500"><p>{error}</p></div></Layout>;
   }
 
   if (!prescription) {
-    return <Layout title="Not Found"><div className="text-center py-10"><p>Prescription not found.</p></div></Layout>;
+    return <Layout title="Prescription Details"><div className="text-center py-8"><p>Prescription not found.</p></div></Layout>;
   }
 
   return (
     <Layout title="Prescription Details">
-      <div className="max-w-5xl mx-auto space-y-8 p-4">
-        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-gray-200">
+      <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+        <div className="flex justify-between items-start mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Prescription Details</h1>
-            <p className="text-gray-500 mt-1">ID: {prescription.id}</p>
+            <h2 className="text-3xl font-bold text-gray-900">Prescription Details</h2>
+            <p className="text-gray-500">Issued on: {new Date(prescription.createdAt).toLocaleDateString()}</p>
           </div>
-          <button
-            onClick={() => window.print()}
-            className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-medical-600 text-white rounded-lg text-sm font-medium hover:bg-medical-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-medical-500"
-          >
-            <Printer className="w-4 h-4 mr-2" />
-            Print Prescription
-          </button>
-        </header>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1 space-y-6">
-            <InfoCard title="Patient Information" icon={User}>
-              <DetailItem label="Name" value={prescription.patient.fullName} />
-              <DetailItem label="Patient ID" value={prescription.patientId} />
-            </InfoCard>
-
-            <InfoCard title="Issuing Details" icon={Calendar}>
-              <DetailItem label="Issued On" value={new Date(prescription.createdAt).toLocaleString()} />
-              <DetailItem label="Status" value={prescription.status} />
-              <DetailItem label="Follow-up Date" value={prescription.followUpDate ? new Date(prescription.followUpDate).toLocaleDateString() : 'N/A'} />
-            </InfoCard>
+          <div className="text-right">
+            <p className="font-semibold">{prescription.patient.fullName}</p>
+            <p className="text-sm text-gray-600">Patient ID: {prescription.patientId}</p>
           </div>
+        </div>
 
-          <div className="lg:col-span-2 space-y-6">
-            <InfoCard title="Clinical Information" icon={Stethoscope}>
-              <DetailItem label="Chief Complaints" value={prescription.chiefComplaints} />
-              <DetailItem label="Findings on Exam" value={prescription.findingsOnExam} />
-              <DetailItem label="Advice" value={prescription.advice} />
-            </InfoCard>
-
-            <InfoCard title="Medications" icon={Pill}>
-              <div className="space-y-4">
-                {prescription.medicines.map((med, index) => (
-                  <div key={index} className="p-4 border rounded-lg bg-gray-50">
-                    <p className="font-bold text-lg text-medical-700">{med.name}</p>
-                    <p className="text-sm text-gray-600 mb-2">{med.genericName}</p>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-                      <p><span className="font-medium text-gray-500">Route:</span> {med.route}</p>
-                      <p><span className="font-medium text-gray-500">Form:</span> {med.form}</p>
-                      <p><span className="font-medium text-gray-500">Dose:</span> {med.quantityPerDose}</p>
-                      <p><span className="font-medium text-gray-500">Frequency:</span> {med.frequency}</p>
-                      <p><span className="font-medium text-gray-500">Duration:</span> {med.durationInDays} days</p>
-                      <p><span className="font-medium text-gray-500">Total:</span> {med.totalQuantity}</p>
-                    </div>
-                    <p className="mt-3 text-sm bg-blue-50 p-3 rounded-md"><span className="font-semibold text-blue-800">Instruction:</span> {med.fullInstruction}</p>
-                  </div>
-                ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-2 border-b pb-2">Clinical Information</h3>
+            <div className="space-y-3 mt-3">
+              <div>
+                <p className="font-medium text-gray-600">Chief Complaints</p>
+                <p className="text-gray-800">{prescription.chiefComplaints}</p>
               </div>
-            </InfoCard>
+              <div>
+                <p className="font-medium text-gray-600">Findings on Exam</p>
+                <p className="text-gray-800">{prescription.findingsOnExam}</p>
+              </div>
+              <div>
+                <p className="font-medium text-gray-600">Advice</p>
+                <p className="text-gray-800">{prescription.advice}</p>
+              </div>
+              {prescription.followUpDate && (
+                <div>
+                  <p className="font-medium text-gray-600">Follow-up Date</p>
+                  <p className="text-gray-800">{new Date(prescription.followUpDate).toLocaleDateString()}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-gray-800 mb-3 border-b pb-2">Medications</h3>
+          <div className="space-y-4">
+            {prescription.medicines.map((med: any, index: number) => (
+              <div key={index} className="p-4 border rounded-lg bg-gray-50">
+                <p className="font-bold text-lg text-medical-700">{med.name}</p>
+                <p className="text-sm text-gray-600 mb-2">{med.genericName}</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                  <p><span className="font-medium">Route:</span> {med.route}</p>
+                  <p><span className="font-medium">Form:</span> {med.form}</p>
+                  <p><span className="font-medium">Dose:</span> {med.quantityPerDose}</p>
+                  <p><span className="font-medium">Frequency:</span> {med.frequency}</p>
+                  <p><span className="font-medium">Duration:</span> {med.durationInDays} days</p>
+                  <p><span className="font-medium">Total:</span> {med.totalQuantity}</p>
+                </div>
+                <p className="mt-2 text-sm bg-blue-50 p-2 rounded"><span className="font-medium">Instruction:</span> {med.fullInstruction}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>
