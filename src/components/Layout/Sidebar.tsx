@@ -44,7 +44,7 @@ const Sidebar: React.FC = () => {
         return [
           { icon: LayoutDashboard, label: 'Dashboard', path: '/doctor/dashboard' },
           { icon: Users, label: 'My Patients', path: '/doctor/patients' },
-          { icon: FileText, label: 'Prescriptions', path: '/doctor/prescriptions' },
+          { icon: FileText, label: 'My Prescriptions', path: '/doctor/my-prescriptions' },
           { icon: UserCheck, label: 'Register Patient', path: '/doctor/register-patient' },
           { icon: Activity, label: 'Patient History', path: '/doctor/patient-history' },
           { icon: Stethoscope, label: 'E-Prescription Tool', path: '/doctor/e-prescription' },

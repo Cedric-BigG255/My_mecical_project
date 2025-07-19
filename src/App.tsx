@@ -23,6 +23,7 @@ import FindPharmacies from './pages/Patient/FindPharmacies';
 import MyPatients from './pages/Doctor/MyPatients';
 import EPrescription from './pages/Doctor/EPrescription';
 import RegisterPatient from './pages/Doctor/RegisterPatient';
+import MyPrescriptionsDoctor from './pages/Doctor/MyPrescriptions';
 
 // Pharmacist Pages
 import PrescriptionManagement from './pages/Pharmacist/PrescriptionManagement';
@@ -133,6 +134,11 @@ const AppContent: React.FC = () => {
       <Route path="/doctor/register-patient" element={
         <ProtectedRoute allowedRoles={['doctor']}>
           <RegisterPatient />
+        </ProtectedRoute>
+      } />
+      <Route path="/doctor/my-prescriptions" element={
+        <ProtectedRoute allowedRoles={['doctor']}>
+          <MyPrescriptionsDoctor />
         </ProtectedRoute>
       } />
       
