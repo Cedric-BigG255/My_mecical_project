@@ -72,14 +72,14 @@ const MedicineManagement: React.FC = () => {
       
       const result = await response.json();
       
-      if (result.success) {
+      if (result.statusCode === 200) {
         // Transform the data to match our interface
-        const transformedData = (result.data.data || []).map((medicine: any) => ({
+        const transformedData = (result.data || []).map((medicine: any) => ({
           id: medicine.id,
           brandName: medicine.brandName,
           genericName: medicine.genericName,
           manufacturer: medicine.manufacturer,
-          price: medicine.price,
+          price: parseFloat(medicine.price), // Assuming price is a string in the API response
           createdAt: medicine.createdAt,
           updatedAt: medicine.updatedAt,
           // Add mock data for additional fields that might not be in the API yet
@@ -94,9 +94,9 @@ const MedicineManagement: React.FC = () => {
         
         setMedicines(transformedData);
         
-        // Set pagination data
-        if (result.data.meta) {
-          setTotalPages(result.data.meta.totalPages || 1);
+        // Set pagination data if available in the response
+        if (result.meta) {
+          setTotalPages(result.meta.totalPages || 1);
         }
       } else {
         throw new Error(result.message || 'Failed to fetch medicines');
@@ -105,51 +105,7 @@ const MedicineManagement: React.FC = () => {
       console.error('Error fetching medicines:', err);
       setError(err.message || 'An error occurred while fetching medicines');
       
-      // Use mock data for development
-      setMedicines([
-        {
-          id: 'm1',
-          brandName: 'Paracetamol',
-          genericName: 'Acetaminophen',
-          manufacturer: 'PharmaCorp',
-          price: 5.99,
-          category: 'Analgesic',
-          dosageForm: 'Tablet',
-          strength: '500mg',
-          currentStock: 150,
-          minStock: 50,
-          expiryDate: '2025-06-15',
-          requiresPrescription: false
-        },
-        {
-          id: 'm2',
-          brandName: 'Amoxil',
-          genericName: 'Amoxicillin',
-          manufacturer: 'AntiBio Labs',
-          price: 12.50,
-          category: 'Antibiotic',
-          dosageForm: 'Capsule',
-          strength: '500mg',
-          currentStock: 120,
-          minStock: 30,
-          expiryDate: '2024-12-20',
-          requiresPrescription: true
-        },
-        {
-          id: 'm3',
-          brandName: 'Lantus',
-          genericName: 'Insulin Glargine',
-          manufacturer: 'DiabetesCare Inc.',
-          price: 89.99,
-          category: 'Antidiabetic',
-          dosageForm: 'Injection',
-          strength: '100 units/mL',
-          currentStock: 45,
-          minStock: 10,
-          expiryDate: '2024-08-30',
-          requiresPrescription: true
-        }
-      ]);
+      setMedicines([]);
     } finally {
       setLoading(false);
     }
