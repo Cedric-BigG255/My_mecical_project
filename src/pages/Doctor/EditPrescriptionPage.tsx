@@ -26,7 +26,7 @@ import {
 const EditPrescriptionPage: React.FC = () => {
   const { prescriptionId } = useParams<{ prescriptionId: string }>();
   const navigate = useNavigate();
-  const { addToast } = useToast();
+  const { showToast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -48,7 +48,7 @@ const EditPrescriptionPage: React.FC = () => {
   useEffect(() => {
     const fetchPrescription = async () => {
       if (!prescriptionId) {
-        addToast('No prescription ID provided', 'error');
+        showToast('No prescription ID provided', 'error');
         navigate('/doctor/my-prescriptions');
         return;
       }
@@ -87,7 +87,7 @@ const EditPrescriptionPage: React.FC = () => {
         });
 
       } catch (error: any) {
-        addToast(error.response?.data?.message || 'Failed to fetch prescription', 'error');
+        showToast(error.response?.data?.message || 'Failed to fetch prescription', 'error');
         navigate('/doctor/my-prescriptions');
       } finally {
         setIsLoading(false);
@@ -95,7 +95,7 @@ const EditPrescriptionPage: React.FC = () => {
     };
 
     fetchPrescription();
-  }, [prescriptionId, navigate, addToast]);
+  }, [prescriptionId, navigate, showToast]);
 
   useEffect(() => {
     if (debouncedMedicineSearch) {
@@ -171,14 +171,14 @@ const EditPrescriptionPage: React.FC = () => {
     try {
       const response = await apiClient.patch(`/prescriptions/${prescriptionId}`, payload);
       if (response.success) {
-        addToast('Prescription updated successfully!', 'success');
+        showToast('Prescription updated successfully!', 'success');
         setInitialFormState(prescriptionForm);
         navigate(`/doctor/prescriptions/${prescriptionId}`);
       } else {
-        addToast(response.message || 'Failed to update prescription', 'error');
+        showToast(response.message || 'Failed to update prescription', 'error');
       }
     } catch (error: any) {
-      addToast(error.response?.data?.message || 'An unexpected error occurred', 'error');
+      showToast(error.response?.data?.message || 'An unexpected error occurred', 'error');
     } finally {
       setIsSaving(false);
     }
