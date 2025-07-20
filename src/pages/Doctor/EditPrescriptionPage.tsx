@@ -470,4 +470,4 @@ const EditPrescriptionPage: React.FC = () => {
   );
 };
 
-export default EPrescription;
+export default EditPrescriptionPage;
