@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Layout from '../../components/Layout/Layout';
 import { apiClient } from '../../utils/api';
 import { Link } from 'react-router-dom';
-import { Eye } from 'lucide-react';
+import { Eye, Edit } from 'lucide-react';
 
 interface Prescription {
   id: string;
@@ -58,7 +58,7 @@ const MyPrescriptions: React.FC = () => {
                     Status
                   </th>
                   <th scope="col" className="relative px-6 py-3">
-                    <span className="sr-only">View</span>
+                    <span className="sr-only">Actions</span>
                   </th>
                 </tr>
               </thead>
@@ -95,7 +95,10 @@ const MyPrescriptions: React.FC = () => {
                           {prescription.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium flex items-center space-x-4">
+                        <Link to={`/doctor/prescriptions/edit/${prescription.id}`} className="text-gray-600 hover:text-gray-900">
+                          <Edit className="w-5 h-5" />
+                        </Link>
                         <Link to={`/doctor/prescriptions/${prescription.id}`} className="text-medical-600 hover:text-medical-900">
                           <Eye className="w-5 h-5" />
                         </Link>
