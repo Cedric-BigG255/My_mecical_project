@@ -1,19 +1,25 @@
-export interface Patient {
-  id: string;
+export interface Doctor {
   fullName: string;
-  dateOfBirth: string;
+  specialty: string;
 }
 
-export interface Medication {
+export interface Hospital {
+  name: string;
+}
+
+export interface Medicine {
   id: string;
   brandName: string;
   genericName: string;
+  manufacturer: string;
+  price: string;
+  createdAt: string;
 }
 
-export interface PrescriptionMedication {
+export interface PrescriptionMedicine {
+  id: string;
+  prescriptionId: string;
   medicineId: string;
-  name: string;
-  genericName: string;
   route: string;
   form: string;
   quantityPerDose: number;
@@ -21,20 +27,25 @@ export interface PrescriptionMedication {
   durationInDays: number;
   fullInstruction: string;
   totalQuantity: string;
+  isDispensed: boolean;
+  medicine: Medicine;
 }
 
-export interface PrescriptionForm {
-  patientId: string;
-  chiefComplaints: string;
-  findingsOnExam: string;
-  advice: string;
-  followUpDate?: string;
-  medicines: PrescriptionMedication[];
-}
-
-export interface Prescription extends PrescriptionForm {
+export interface Prescription {
   id: string;
   createdAt: string;
-  patient: Patient;
-  status: string;
+  patientId: string;
+  doctorId: string;
+  hospitalId: string;
+  chiefComplaints: string;
+  findingsOnExam: string;
+  investigations: string | null;
+  advice: string;
+  followUpDate: string;
+  status: 'ACTIVE' | 'CANCELLED' | 'FULFILLED' | 'EXPIRED';
+  dispensedById: string | null;
+  dispensedAt: string | null;
+  doctor: Doctor;
+  hospital: Hospital;
+  medicines: PrescriptionMedicine[];
 }
