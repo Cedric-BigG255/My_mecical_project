@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '../../components/Layout/Layout';
 import { 
   FileText, 
@@ -15,124 +15,54 @@ import {
   XCircle,
   RefreshCw,
   Share2,
-  QrCode
+  QrCode,
+  Loader
 } from 'lucide-react';
-
-interface Prescription {
-  id: string;
-  doctorName: string;
-  doctorSpecialty: string;
-  issuedDate: string;
-  validUntil: string;
-  status: 'active' | 'expired' | 'fulfilled' | 'cancelled';
-  medications: Medication[];
-  diagnosis: string;
-  notes?: string;
-  qrCode: string;
-}
-
-interface Medication {
-  name: string;
-  dosage: string;
-  frequency: string;
-  duration: string;
-  instructions: string;
-  quantity: number;
-  refills: number;
-}
+import { Prescription } from '../../types/prescription';
+import { apiClient } from '../../utils/api';
+import { toast } from 'react-toastify';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const MyPrescriptions: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null);
   const [showQRCode, setShowQRCode] = useState(false);
+  const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const prescriptions: Prescription[] = [
-    {
-      id: 'RX001',
-      doctorName: 'Dr. John Smith',
-      doctorSpecialty: 'Internal Medicine',
-      issuedDate: '2024-01-25',
-      validUntil: '2024-02-25',
-      status: 'active',
-      diagnosis: 'Hypertension',
-      notes: 'Take with food. Monitor blood pressure regularly.',
-      qrCode: 'QR_CODE_DATA_HERE',
-      medications: [
-        {
-          name: 'Lisinopril',
-          dosage: '10mg',
-          frequency: 'Once daily',
-          duration: '30 days',
-          instructions: 'Take in the morning with or without food',
-          quantity: 30,
-          refills: 5
-        },
-        {
-          name: 'Hydrochlorothiazide',
-          dosage: '25mg',
-          frequency: 'Once daily',
-          duration: '30 days',
-          instructions: 'Take in the morning, may cause increased urination',
-          quantity: 30,
-          refills: 5
+  useEffect(() => {
+    const fetchPrescriptions = async () => {
+      try {
+        setLoading(true);
+        const response = await apiClient.get<Prescription[]>('/prescriptions/patient/me');
+        if (response.success) {
+          setPrescriptions(response.data);
+        } else {
+          toast.error(response.message);
+          setError(response.message);
         }
-      ]
-    },
-    {
-      id: 'RX002',
-      doctorName: 'Dr. Sarah Johnson',
-      doctorSpecialty: 'Family Medicine',
-      issuedDate: '2024-01-20',
-      validUntil: '2024-01-27',
-      status: 'fulfilled',
-      diagnosis: 'Upper Respiratory Infection',
-      notes: 'Complete the full course of antibiotics.',
-      qrCode: 'QR_CODE_DATA_HERE',
-      medications: [
-        {
-          name: 'Amoxicillin',
-          dosage: '500mg',
-          frequency: 'Three times daily',
-          duration: '7 days',
-          instructions: 'Take with food to reduce stomach upset',
-          quantity: 21,
-          refills: 0
-        }
-      ]
-    },
-    {
-      id: 'RX003',
-      doctorName: 'Dr. Michael Chen',
-      doctorSpecialty: 'Cardiology',
-      issuedDate: '2024-01-15',
-      validUntil: '2024-01-22',
-      status: 'expired',
-      diagnosis: 'Chest Pain Evaluation',
-      qrCode: 'QR_CODE_DATA_HERE',
-      medications: [
-        {
-          name: 'Aspirin',
-          dosage: '81mg',
-          frequency: 'Once daily',
-          duration: '7 days',
-          instructions: 'Take with food',
-          quantity: 7,
-          refills: 0
-        }
-      ]
-    }
-  ];
+      } catch (error: any) {
+        toast.error(error.message);
+        setError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPrescriptions();
+  }, []);
 
   const getStatusIcon = (status: Prescription['status']) => {
     switch (status) {
-      case 'active':
+      case 'ACTIVE':
         return <CheckCircle className="w-5 h-5 text-green-500" />;
-      case 'expired':
+      case 'EXPIRED':
         return <XCircle className="w-5 h-5 text-red-500" />;
-      case 'fulfilled':
+      case 'FULFILLED':
         return <CheckCircle className="w-5 h-5 text-blue-500" />;
-      case 'cancelled':
+      case 'CANCELLED':
         return <XCircle className="w-5 h-5 text-gray-500" />;
       default:
         return <AlertCircle className="w-5 h-5 text-yellow-500" />;
@@ -141,13 +71,13 @@ const MyPrescriptions: React.FC = () => {
 
   const getStatusColor = (status: Prescription['status']) => {
     switch (status) {
-      case 'active':
+      case 'ACTIVE':
         return 'bg-green-100 text-green-800';
-      case 'expired':
+      case 'EXPIRED':
         return 'bg-red-100 text-red-800';
-      case 'fulfilled':
+      case 'FULFILLED':
         return 'bg-blue-100 text-blue-800';
-      case 'cancelled':
+      case 'CANCELLED':
         return 'bg-gray-100 text-gray-800';
       default:
         return 'bg-yellow-100 text-yellow-800';
@@ -155,12 +85,28 @@ const MyPrescriptions: React.FC = () => {
   };
 
   const filteredPrescriptions = prescriptions.filter(prescription => {
-    const matchesSearch = prescription.doctorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         prescription.diagnosis.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         prescription.medications.some(med => med.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesStatus = statusFilter === 'all' || prescription.status === statusFilter;
+    const matchesSearch = prescription.doctor.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         prescription.chiefComplaints.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         prescription.medicines.some(med => med.medicine.brandName.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesStatus = statusFilter === 'all' || prescription.status.toLowerCase() === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  if (loading) {
+    return <Layout title="My Prescriptions"><LoadingSpinner /></Layout>;
+  }
+
+  if (error) {
+    return (
+      <Layout title="My Prescriptions">
+        <div className="text-center py-12">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Error loading prescriptions</h3>
+          <p className="text-gray-500">{error}</p>
+        </div>
+      </Layout>
+    );
+  }
 
   if (selectedPrescription) {
     return (
@@ -178,8 +124,8 @@ const MyPrescriptions: React.FC = () => {
             <div className="bg-gradient-to-r from-medical-600 to-primary-600 p-6 text-white">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-2xl font-bold">Prescription #{selectedPrescription.id}</h1>
-                  <p className="text-medical-100">Digital Prescription</p>
+                  <h1 className="text-2xl font-bold">Prescription #{selectedPrescription.id.slice(-6)}</h1>
+                  <p className="text-medical-100">Digital Prescription from {selectedPrescription.hospital.name}</p>
                 </div>
                 <div className="flex items-center space-x-3">
                   <button
@@ -206,11 +152,11 @@ const MyPrescriptions: React.FC = () => {
                   <div className="space-y-2">
                     <div className="flex items-center">
                       <User className="w-5 h-5 text-gray-400 mr-3" />
-                      <span className="font-medium">{selectedPrescription.doctorName}</span>
+                      <span className="font-medium">{selectedPrescription.doctor.fullName}</span>
                     </div>
                     <div className="flex items-center">
                       <span className="w-5 h-5 mr-3"></span>
-                      <span className="text-gray-600">{selectedPrescription.doctorSpecialty}</span>
+                      <span className="text-gray-600">{selectedPrescription.doctor.specialty}</span>
                     </div>
                   </div>
                 </div>
@@ -220,16 +166,16 @@ const MyPrescriptions: React.FC = () => {
                   <div className="space-y-2">
                     <div className="flex items-center">
                       <Calendar className="w-5 h-5 text-gray-400 mr-3" />
-                      <span>Issued: {new Date(selectedPrescription.issuedDate).toLocaleDateString()}</span>
+                      <span>Issued: {new Date(selectedPrescription.createdAt).toLocaleDateString()}</span>
                     </div>
                     <div className="flex items-center">
                       <Clock className="w-5 h-5 text-gray-400 mr-3" />
-                      <span>Valid Until: {new Date(selectedPrescription.validUntil).toLocaleDateString()}</span>
+                      <span>Follow-up: {selectedPrescription.followUpDate ? new Date(selectedPrescription.followUpDate).toLocaleDateString() : 'N/A'}</span>
                     </div>
                     <div className="flex items-center">
                       {getStatusIcon(selectedPrescription.status)}
                       <span className={`ml-3 px-2 py-1 rounded-full text-sm font-medium ${getStatusColor(selectedPrescription.status)}`}>
-                        {selectedPrescription.status.charAt(0).toUpperCase() + selectedPrescription.status.slice(1)}
+                        {selectedPrescription.status.charAt(0).toUpperCase() + selectedPrescription.status.slice(1).toLowerCase()}
                       </span>
                     </div>
                   </div>
@@ -238,45 +184,49 @@ const MyPrescriptions: React.FC = () => {
 
               {/* Diagnosis */}
               <div className="mb-8">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Diagnosis</h3>
-                <p className="text-gray-700 bg-gray-50 p-4 rounded-lg">{selectedPrescription.diagnosis}</p>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Chief Complaints</h3>
+                <p className="text-gray-700 bg-gray-50 p-4 rounded-lg">{selectedPrescription.chiefComplaints}</p>
               </div>
 
               {/* Medications */}
               <div className="mb-8">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Prescribed Medications</h3>
                 <div className="space-y-4">
-                  {selectedPrescription.medications.map((medication, index) => (
+                  {selectedPrescription.medicines.map((medication, index) => (
                     <div key={index} className="border border-gray-200 rounded-lg p-4">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center">
                           <Pill className="w-5 h-5 text-medical-600 mr-3" />
                           <div>
-                            <h4 className="font-semibold text-gray-900">{medication.name}</h4>
-                            <p className="text-gray-600">{medication.dosage}</p>
+                            <h4 className="font-semibold text-gray-900">{medication.medicine.brandName}</h4>
+                            <p className="text-gray-600">{medication.medicine.genericName}</p>
                           </div>
                         </div>
-                        <span className="text-sm text-gray-500">Qty: {medication.quantity}</span>
+                        <span className="text-sm text-gray-500">Qty: {medication.totalQuantity}</span>
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium text-gray-700">Route:</span>
+                          <span className="ml-2 text-gray-600">{medication.route}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Form:</span>
+                          <span className="ml-2 text-gray-600">{medication.form}</span>
+                        </div>
                         <div>
                           <span className="font-medium text-gray-700">Frequency:</span>
                           <span className="ml-2 text-gray-600">{medication.frequency}</span>
                         </div>
                         <div>
                           <span className="font-medium text-gray-700">Duration:</span>
-                          <span className="ml-2 text-gray-600">{medication.duration}</span>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-700">Refills:</span>
-                          <span className="ml-2 text-gray-600">{medication.refills} remaining</span>
+                          <span className="ml-2 text-gray-600">{medication.durationInDays} days</span>
                         </div>
                       </div>
                       
                       <div className="mt-3 p-3 bg-blue-50 rounded-lg">
                         <p className="text-sm text-blue-800">
-                          <span className="font-medium">Instructions:</span> {medication.instructions}
+                          <span className="font-medium">Instructions:</span> {medication.fullInstruction}
                         </p>
                       </div>
                     </div>
@@ -285,11 +235,11 @@ const MyPrescriptions: React.FC = () => {
               </div>
 
               {/* Notes */}
-              {selectedPrescription.notes && (
+              {selectedPrescription.advice && (
                 <div className="mb-8">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Doctor's Notes</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Doctor's Advice</h3>
                   <p className="text-gray-700 bg-yellow-50 p-4 rounded-lg border-l-4 border-yellow-400">
-                    {selectedPrescription.notes}
+                    {selectedPrescription.advice}
                   </p>
                 </div>
               )}
@@ -354,7 +304,7 @@ const MyPrescriptions: React.FC = () => {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Active</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {prescriptions.filter(p => p.status === 'active').length}
+                  {prescriptions.filter(p => p.status === 'ACTIVE').length}
                 </p>
               </div>
             </div>
@@ -367,7 +317,7 @@ const MyPrescriptions: React.FC = () => {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Fulfilled</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {prescriptions.filter(p => p.status === 'fulfilled').length}
+                  {prescriptions.filter(p => p.status === 'FULFILLED').length}
                 </p>
               </div>
             </div>
@@ -380,7 +330,7 @@ const MyPrescriptions: React.FC = () => {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Expired</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {prescriptions.filter(p => p.status === 'expired').length}
+                  {prescriptions.filter(p => p.status === 'EXPIRED').length}
                 </p>
               </div>
             </div>
@@ -444,35 +394,35 @@ const MyPrescriptions: React.FC = () => {
                   <div className="flex items-center space-x-3 mb-3">
                     {getStatusIcon(prescription.status)}
                     <h3 className="text-lg font-semibold text-gray-900">
-                      Prescription #{prescription.id}
+                      Prescription #{prescription.id.slice(-6)}
                     </h3>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(prescription.status)}`}>
-                      {prescription.status.charAt(0).toUpperCase() + prescription.status.slice(1)}
+                      {prescription.status.charAt(0).toUpperCase() + prescription.status.slice(1).toLowerCase()}
                     </span>
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
                       <p className="text-sm text-gray-500">Doctor</p>
-                      <p className="font-medium text-gray-900">{prescription.doctorName}</p>
-                      <p className="text-sm text-gray-600">{prescription.doctorSpecialty}</p>
+                      <p className="font-medium text-gray-900">{prescription.doctor.fullName}</p>
+                      <p className="text-sm text-gray-600">{prescription.doctor.specialty}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Diagnosis</p>
-                      <p className="font-medium text-gray-900">{prescription.diagnosis}</p>
+                      <p className="text-sm text-gray-500">Chief Complaints</p>
+                      <p className="font-medium text-gray-900">{prescription.chiefComplaints}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">Issued Date</p>
                       <p className="font-medium text-gray-900">
-                        {new Date(prescription.issuedDate).toLocaleDateString()}
+                        {new Date(prescription.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-center space-x-4 text-sm text-gray-600">
-                    <span>{prescription.medications.length} medication(s)</span>
+                    <span>{prescription.medicines.length} medication(s)</span>
                     <span>•</span>
-                    <span>Valid until {new Date(prescription.validUntil).toLocaleDateString()}</span>
+                    <span>Follow-up on {prescription.followUpDate ? new Date(prescription.followUpDate).toLocaleDateString() : 'N/A'}</span>
                   </div>
                 </div>
 
